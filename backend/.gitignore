@@ -1,0 +1,43 @@
+# ==========================================
+# Backend .gitignore
+# ==========================================
+
+# SECRET — kabhi bhi GitHub pe mat jaane do
+.env
+*.env
+
+# Firebase service account (CRITICAL)
+firebase-adminsdk*.json
+service-account*.json
+*serviceAccount*.json
+credentials.json
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# AI Models (bahut bade hain)
+*.pth
+*.onnx
+*.pb
+models/
+/tmp/*.pb
+
+# Logs
+*.log
+logs/
+
+# Temp uploads
+uploads/
+temp/
+
+# IDE
+.idea/
+.vscode/
+.DS_Store
