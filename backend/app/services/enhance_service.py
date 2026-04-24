@@ -1,64 +1,44 @@
 """
-Image enhancement using OpenCV DNN Super Resolution.
-Models: EDSR, ESPCN, FSRCNN — all FREE and open source.
-Downloads ~5MB model on first use.
+Image enhancement using PIL + OpenCV basic ops.
+100% FREE - no dnn_superres needed, works on Render free tier.
 """
 import cv2
 import numpy as np
-from cv2 import dnn_superres
 from PIL import Image, ImageEnhance, ImageFilter
-import io, asyncio, logging, os, urllib.request
+import io
+import asyncio
+import logging
 from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 _executor = ThreadPoolExecutor(max_workers=1)
-_sr = None
-
-# Free OpenCV super resolution model
-MODEL_URL = "https://github.com/Saafke/EDSR_Tensorflow/raw/master/models/EDSR_x2.pb"
-MODEL_PATH = "/tmp/EDSR_x2.pb"
-
-
-def _load_sr_model():
-    global _sr
-    if _sr is not None:
-        return _sr
-    if not os.path.exists(MODEL_PATH):
-        logger.info("Downloading EDSR model (~5MB)...")
-        urllib.request.urlretrieve(MODEL_URL, MODEL_PATH)
-        logger.info("✅ EDSR model downloaded")
-    sr = dnn_superres.DnnSuperResImpl_create()
-    sr.readModel(MODEL_PATH)
-    sr.setModel("edsr", 2)
-    _sr = sr
-    return _sr
 
 
 def _do_enhance(image_bytes: bytes, scale: int, enhance_type: str) -> bytes:
+    # Decode
     np_arr = np.frombuffer(image_bytes, np.uint8)
     img_cv = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
 
     if enhance_type == "upscale":
-        try:
-            sr = _load_sr_model()
-            result = sr.upsample(img_cv)
-            if scale == 4:
-                # Apply 2x again for 4x total
-                result = sr.upsample(result)
-        except Exception as e:
-            logger.warning(f"SR model failed, using bicubic: {e}")
-            h, w = img_cv.shape[:2]
-            result = cv2.resize(img_cv, (w * scale, h * scale), interpolation=cv2.INTER_CUBIC)
+        h, w = img_cv.shape[:2]
+        # Lanczos upscale — good quality, no special module needed
+        result = cv2.resize(
+            img_cv,
+            (w * scale, h * scale),
+            interpolation=cv2.INTER_LANCZOS4
+        )
 
     elif enhance_type == "denoise":
         result = cv2.fastNlMeansDenoisingColored(img_cv, None, 10, 10, 7, 21)
 
     elif enhance_type == "sharpen":
-        kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
+        kernel = np.array([[0, -1, 0],
+                           [-1, 5, -1],
+                           [0, -1, 0]])
         result = cv2.filter2D(img_cv, -1, kernel)
 
     elif enhance_type == "brightness":
-        # Auto brightness + contrast
+        # CLAHE auto brightness/contrast
         lab = cv2.cvtColor(img_cv, cv2.COLOR_BGR2LAB)
         l, a, b = cv2.split(lab)
         clahe = cv2.createCLAHE(clipLimit=3.0, tileGridSize=(8, 8))
